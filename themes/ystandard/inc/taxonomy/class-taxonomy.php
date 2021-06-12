@@ -180,7 +180,7 @@ class Taxonomy {
 
 		$filter = apply_filters( "ys_is_active_${post_type}_taxonomy", null );
 		if ( is_null( $filter ) ) {
-			$fallback = Content::get_fallback_post_type( $post_type );
+			// $fallback = Content::get_fallback_post_type( $post_type );
 			$result   = Option::get_option_by_bool( "ys_show_${fallback}_category", true );
 		} else {
 			$result = $filter;

@@ -50,6 +50,7 @@ class Content {
 		add_filter( 'the_content', [ $this, 'the_content_hook' ] );
 		add_filter( 'get_the_excerpt', [ $this, 'get_the_excerpt' ], 10, 2 );
 		add_filter( 'widget_text', [ $this, 'responsive_iframe' ] );
+		add_filter( 'get_the_archive_title', [ $this, 'archive_title' ] );
 		add_filter( 'document_title_separator', [ $this, 'title_separator' ] );
 		add_filter( 'excerpt_length', [ $this, 'excerpt_length' ], 999 );
 		add_action( 'customize_register', [ $this, 'customize_register_post' ] );
@@ -143,28 +144,6 @@ class Content {
 	}
 
 	/**
-	 * Fallback Post Type
-	 *
-	 * @param string $post_type Post type.
-	 *
-	 * @return string
-	 */
-	public static function get_fallback_post_type( $post_type ) {
-
-		if ( 'post' === $post_type ) {
-			return 'post';
-		}
-		if ( 'page' === $post_type ) {
-			return 'page';
-		}
-		if ( 'attachment' === $post_type ) {
-			return 'attachment';
-		}
-
-		return is_post_type_hierarchical( $post_type ) ? 'page' : 'post';
-	}
-
-	/**
 	 * アイキャッチ画像を表示するか
 	 *
 	 * @param int $post_id 投稿ID.
@@ -176,22 +155,18 @@ class Content {
 		if ( ! is_singular() ) {
 			return false;
 		}
-		if ( ! Template::is_active_post_header() ) {
-			return false;
-		}
 		if ( ! has_post_thumbnail( $post_id ) ) {
 			$result = false;
 		}
-		$post_type = self::get_post_type();
-		$filter    = apply_filters( "ys_show_${post_type}_header_thumbnail", null );
-		if ( is_null( $filter ) ) {
-			$fallback = Content::get_fallback_post_type( $post_type );
-			$option   = Option::get_option_by_bool( "ys_show_${fallback}_header_thumbnail", true );
-		} else {
-			$option = $filter;
+		if ( is_single() ) {
+			if ( ! Option::get_option_by_bool( 'ys_show_post_header_thumbnail', true ) ) {
+				$result = false;
+			}
 		}
-		if ( is_singular( $post_type ) ) {
-			$result = ! $option ? false : $result;
+		if ( is_page() ) {
+			if ( ! Option::get_option_by_bool( 'ys_show_page_header_thumbnail', true ) ) {
+				$result = false;
+			}
 		}
 
 		return apply_filters( 'ys_is_active_post_thumbnail', $result );
@@ -203,17 +178,10 @@ class Content {
 	 * @return bool
 	 */
 	public static function is_full_post_thumbnail() {
-
-		$post_type = self::get_post_type();
-		$filter    = apply_filters( "ys_${post_type}_post_thumbnail_type", null );
-		if ( is_null( $filter ) ) {
-			$fallback = Content::get_fallback_post_type( $post_type );
-			$type     = Option::get_option( "ys_${fallback}_post_thumbnail_type", 'default' );
-		} else {
-			$type = $filter;
+		if ( is_single() && 'full' === Option::get_option( 'ys_post_post_thumbnail_type', 'default' ) ) {
+			return true;
 		}
-
-		if ( is_singular( $post_type ) && 'full' === $type ) {
+		if ( is_page() && 'full' === Option::get_option( 'ys_page_post_thumbnail_type', 'default' ) ) {
 			return true;
 		}
 
@@ -226,19 +194,10 @@ class Content {
 	 * @return bool
 	 */
 	public static function is_active_related_posts() {
-		if ( ! is_singular() ) {
+		if ( ! is_single() ) {
 			return false;
 		}
-		$post_type = self::get_post_type();
-		$filter    = apply_filters( "ys_show_${post_type}_related", null );
-		if ( is_null( $filter ) ) {
-			$fallback = Content::get_fallback_post_type( $post_type );
-			$show     = Option::get_option_by_bool( "ys_show_${fallback}_related", true );
-		} else {
-			$show = $filter;
-		}
-
-		if ( ! $show ) {
+		if ( ! Option::get_option_by_bool( 'ys_show_post_related', true ) ) {
 			return false;
 		}
 		if ( Utility::to_bool( Content::get_post_meta( 'ys_hide_related' ) ) ) {
@@ -254,23 +213,15 @@ class Content {
 	 * @return array|bool
 	 */
 	public static function get_post_date_data() {
-
 		$text_format     = get_option( 'date_format' );
 		$datetime_format = 'Y-m-d';
 		$result          = [];
 		/**
 		 * 設定取得
 		 */
-		$post_type = self::get_post_type();
-		$filter    = apply_filters( "ys_show_${post_type}_publish_date", null );
-		if ( is_null( $filter ) ) {
-			$fallback = Content::get_fallback_post_type( $post_type );
-			$option   = Option::get_option( "ys_show_${fallback}_publish_date", 'both' );
-		} else {
-			$option = $filter;
-		}
-
-		if ( 'none' === $option || false === $option ) {
+		$option = is_page() ? 'page' : 'post';
+		$option = Option::get_option( "ys_show_${option}_publish_date", 'both' );
+		if ( 'none' === $option ) {
 			return false;
 		}
 		if ( Utility::to_bool( Content::get_post_meta( 'ys_hide_publish_date' ) ) ) {
@@ -307,64 +258,21 @@ class Content {
 	 */
 	public static function get_post_header_category() {
 
-		$post_type = self::get_post_type();
-		$filter    = apply_filters( "ys_show_${post_type}_header_taxonomy", null );
-		if ( is_null( $filter ) ) {
-			$fallback = Content::get_fallback_post_type( $post_type );
-			$show     = Option::get_option_by_bool( "ys_show_${fallback}_header_category", true );
-		} else {
-			$show = $filter;
-		}
-
-		if ( ! Utility::to_bool( $show ) ) {
+		if ( ! Option::get_option_by_bool( 'ys_show_post_header_category', true ) ) {
 			return '';
 		}
 
-		$result     = [];
-		$taxonomies = apply_filters(
-			"ys_get_${post_type}_header_taxonomy",
-			self::get_post_header_taxonomies()
-		);
-		if ( empty( $taxonomies ) ) {
+		$taxonomy = apply_filters( 'ys_get_post_header_taxonomy', 'category' );
+		$term     = get_the_terms( false, $taxonomy );
+		if ( is_wp_error( $term ) || empty( $term ) ) {
 			return '';
 		}
-		foreach ( $taxonomies as $taxonomy ) {
-			$term = get_the_terms( false, $taxonomy );
-			if ( is_wp_error( $term ) || empty( $term ) ) {
-				return '';
-			}
-			$result[] = sprintf(
-				'<div class="singular-header__terms">%s%s</div>',
-				Utility::get_taxonomy_icon( $taxonomy ),
-				$term[0]->name
-			);
-		}
 
-		return apply_filters(
-			"ys_get_${post_type}_header_category",
-			implode( '', $result ),
-			$taxonomies
+		return sprintf(
+			'<div class="singular-header__category">%s%s</div>',
+			Icon::get_icon( 'folder' ),
+			$term[0]->name
 		);
-	}
-
-	/**
-	 * 投稿詳細ヘッダー用表示タクソノミー取得
-	 *
-	 * @return array|bool
-	 */
-	public static function get_post_header_taxonomies() {
-		$taxonomies = get_the_taxonomies();
-		if ( ! $taxonomies ) {
-			return false;
-		}
-
-		$taxonomy = array_keys( $taxonomies );
-
-		if ( 'post' === get_post_type( get_the_ID() ) ) {
-			$taxonomy = [ 'category' ];
-		}
-
-		return $taxonomy;
 	}
 
 	/**
@@ -374,55 +282,22 @@ class Content {
 		if ( ! self::is_active_related_posts() ) {
 			return;
 		}
-
-		$tax_filter = '';
-		$content    = '';
-		$post_type  = self::get_post_type();
-
-		if ( is_singular( 'post' ) ) {
-			$tax_filter = 'category';
-		} elseif ( is_singular() ) {
-			$taxonomies = get_the_taxonomies();
-			if ( $taxonomies ) {
-				$tax_filter = array_key_first( $taxonomies );
-			}
-		}
-		if ( ! empty( $tax_filter ) ) {
-			$tax_filter = apply_filters(
-				"ys_${post_type}_related_posts_taxonomy",
-				$tax_filter
-			);
-			$tax_filter = ! empty( $tax_filter ) ? "tax:${tax_filter}," : '';
-
-			$related = new Recent_Posts();
-			$content = $related->do_shortcode(
-				[
-					'post_type' => self::get_post_type(),
-					'count'     => 6,
-					'filter'    => "${tax_filter}same-post",
-					'list_type' => 'card',
-					'orderby'   => 'rand',
-					'cache'     => 'related_posts',
-					'run_type'  => 'related_posts',
-				]
-			);
-		}
-		$content = apply_filters(
-			"ys_${post_type}_related_posts",
-			$content
+		$related = new Recent_Posts();
+		$content = $related->do_shortcode(
+			[
+				'count'     => 3,
+				'filter'    => 'category,same-post',
+				'list_type' => 'card',
+				'orderby'   => 'rand',
+				'cache'     => 'related_posts',
+			]
 		);
 		if ( $content ) {
-			$related_post_title = apply_filters(
-				'ys_related_post_title',
-				__( 'Related Posts', 'ystandard' )
-			);
-			$related_post       = sprintf(
+			echo sprintf(
 				'<div class="post-related">%s%s</div>',
-				"<p class=\"post-related__title\">${related_post_title}</p>",
-				$content
+				'<p class="post-related__title">関連記事</p>',
+				$content,
 			);
-
-			echo $related_post;
 		}
 	}
 
@@ -445,38 +320,13 @@ class Content {
 	 * アイキャッチ画像の表示 - ヘッダー
 	 */
 	public function header_post_thumbnail() {
-		$thumbnail = $this->get_header_post_thumbnail();
-		if ( empty( $thumbnail ) ) {
+		if ( ! self::is_full_post_thumbnail() ) {
 			return;
 		}
-		ob_start();
-		Template::get_template_part(
-			'template-parts/parts/header-thumbnail',
-			'',
-			[ 'header_thumbnail' => $thumbnail ]
-		);
-		echo ob_get_clean();
-	}
-
-	/**
-	 * ヘッダーサムネイル取得
-	 *
-	 * @return string
-	 */
-	private function get_header_post_thumbnail() {
-
-		$hook = apply_filters( 'ys_get_header_post_thumbnail', null );
-		if ( ! is_null( $hook ) ) {
-			return $hook;
-		}
-		if ( ! self::is_full_post_thumbnail() ) {
-			return '';
-		}
 		if ( ! self::is_active_post_thumbnail() ) {
-			return '';
+			return;
 		}
-
-		return get_the_post_thumbnail(
+		$thumbnail = get_the_post_thumbnail(
 			get_the_ID(),
 			'post-thumbnail',
 			[
@@ -485,6 +335,13 @@ class Content {
 				'alt'   => get_the_title(),
 			]
 		);
+		ob_start();
+		Template::get_template_part(
+			'template-parts/parts/header-thumbnail',
+			'',
+			[ 'header_thumbnail' => $thumbnail ]
+		);
+		echo ob_get_clean();
 	}
 
 	/**
@@ -501,6 +358,7 @@ class Content {
 	 */
 	public function singular_meta() {
 		$date = '';
+		$cat  = '';
 		// 投稿日・更新日.
 		$post_date = self::get_post_date_data();
 		if ( ! empty( $post_date ) ) {
@@ -515,13 +373,11 @@ class Content {
 		// カテゴリー.
 		$cat = self::get_post_header_category();
 
-		$header_meta = sprintf(
+		printf(
 			'<div class="singular-header__meta">%s%s</div>',
 			$date,
 			$cat
 		);
-
-		echo apply_filters( 'ys_singular_header_meta', $header_meta );
 	}
 
 
@@ -657,18 +513,9 @@ class Content {
 		 */
 		foreach ( $list as $value ) {
 			if ( isset( $value['url'] ) && isset( $value['aspect'] ) ) {
+				$replace = '<div class="wp-embed-aspect-' . $value['aspect'] . ' wp-has-aspect-ratio"><div class="wp-block-embed__wrapper">${0}</div></div>';
 				$pattern = '/<iframe[^>]+?' . $value['url'] . '[^<]+?<\/iframe>/is';
-				if ( preg_match_all( $pattern, $content, $match ) ) {
-					foreach ( $match[0] as $map ) {
-						$aspect = preg_match( '/data-aspect-ratio="(.+)?"/is', $map, $aspect_match );
-						if ( empty( $aspect ) || ( isset( $aspect_match[1] ) && 'none' !== $aspect_match[1] ) ) {
-							$embed_aspect = isset( $aspect_match[1] ) ? $aspect_match[1] : $value['aspect'];
-							// 変換.
-							$replace = '<div class="wp-embed-aspect-' . $embed_aspect . ' wp-has-aspect-ratio"><div class="wp-block-embed__wrapper">' . $map . '</div></div>';
-							$content = str_replace( $map, $replace, $content );
-						}
-					}
-				}
+				$content = preg_replace( $pattern, $replace, $content );
 			}
 		}
 
@@ -690,6 +537,98 @@ class Content {
 
 		return get_post_meta( $post_id, $key, true );
 	}
+
+	/**
+	 * アーカイブタイトル
+	 *
+	 * @param string $title title.
+	 *
+	 * @return string
+	 */
+	public function archive_title( $title ) {
+		/**
+		 * 標準フォーマット
+		 */
+		$title_format = apply_filters( 'ys_archive_title_format', '%s' );
+		/**
+		 * ページング
+		 */
+		$paged = get_query_var( 'paged' );
+
+		if ( is_category() ) {
+			$title = sprintf( $title_format, single_cat_title( '', false ) );
+		} elseif ( is_tag() ) {
+			$title = sprintf( $title_format, single_tag_title( '', false ) );
+		} elseif ( is_author() ) {
+			$title = sprintf( $title_format, get_the_author() );
+		} elseif ( is_search() ) {
+			$title_format = '「%s」の検索結果';
+			$title        = sprintf( $title_format, esc_html( get_search_query( false ) ) );
+		} elseif ( is_post_type_archive() ) {
+			$title = sprintf( $title_format, post_type_archive_title( '', false ) );
+		} elseif ( is_tax() ) {
+			$object = get_queried_object();
+			$tax    = get_taxonomy( $object->taxonomy );
+			/* translators: 1: Taxonomy singular name, 2: Current taxonomy term */
+			$title = sprintf(
+				'%1$s : %2$s',
+				$tax->labels->singular_name,
+				single_term_title( '', false )
+			);
+		} elseif ( is_home() ) {
+			if ( 'page' === get_option( 'show_on_front' ) && get_option( 'page_for_posts' ) ) {
+				$title = get_the_title( get_option( 'page_for_posts' ) );
+			} else {
+				$title = '';
+			}
+		}
+
+		return apply_filters( 'ys_get_the_archive_title', $title, $paged );
+	}
+
+	/**
+	 * アーカイブURL
+	 */
+	public static function get_archive_url() {
+		$url            = '';
+		$queried_object = get_queried_object();
+		if ( is_category() ) {
+			$url = get_category_link( $queried_object->term_id );
+		} elseif ( is_tag() ) {
+			$url = get_tag_link( $queried_object->term_id );
+		} elseif ( is_author() ) {
+			$author_id = get_query_var( 'author' );
+			$url       = esc_url( get_author_posts_url( get_the_author_meta( 'ID', $author_id ) ) );
+		} elseif ( is_search() ) {
+			$url = home_url( '/?s=' . urlencode( get_search_query( false ) ) );
+			$url = get_post_type_archive_link( esc_url_raw( $url ) );
+		} elseif ( is_post_type_archive() ) {
+			$post_type = self::get_post_type();
+			$url       = get_post_type_archive_link( $post_type );
+		} elseif ( is_tax() ) {
+			$tax = get_taxonomy( $queried_object->taxonomy );
+			$url = get_term_link( $queried_object->term_id, $tax->name );
+		}
+
+		return apply_filters( 'ys_get_the_archive_url', $url );
+	}
+
+	/**
+	 * アーカイブアイテムクラス作成
+	 *
+	 * @return array
+	 */
+	public static function get_archive_item_class() {
+		$classes = [];
+		/**
+		 * 共通でセットするクラス
+		 */
+		$classes[] = 'archive__item';
+		$classes[] = 'is-' . Archive::get_archive_type();
+
+		return apply_filters( 'get_archive_item_class', $classes );
+	}
+
 
 	/**
 	 * 投稿抜粋文を作成

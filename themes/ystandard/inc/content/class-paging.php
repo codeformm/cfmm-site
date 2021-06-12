@@ -77,7 +77,7 @@ class Paging {
 		$post_type = Content::get_post_type();
 		$filter    = apply_filters( "ys_show_${post_type}_paging", null );
 		if ( is_null( $filter ) ) {
-			$fallback = Content::get_fallback_post_type( $post_type );
+			// $fallback = Content::get_fallback_post_type( $post_type );
 			$option   = Option::get_option_by_bool( "ys_show_${fallback}_paging", true );
 		} else {
 			$option = $filter;

@@ -81,8 +81,12 @@ a[target="_blank"]:not(.sns-share__link):after {
     font-family: "Font Awesome 5 Free";
     color: var(--text-link);
 }
-ul.sns_btns > li > a[target="_blank"]:after {
+ul.sns_btns > li > a[target="_blank"]:after,
+ul.global-nav__menu > li.menu-item-2102 > a[target="_blank"]:after {
 	content: none;
+}
+li.menu-item-2102 .svg-inline--fa.fa-external-link-alt.fa-w-16 {
+	margin: 0 auto;
 }
 .singular-header__thumbnail.post-thumbnail {
     max-height: 390px;
@@ -115,3 +119,13 @@ ul.sns_btns > li > a[target="_blank"]:after {
 	text-decoration: none;
 	color: #067a76;
 }
+.home .author-box,
+.post-name-about .author-box,
+.post-name-contact .author-box,
+.post-name-infocus .author-box {
+	display: none;
+}
+.home .site-content {
+	margin-bottom: 1.25rem;
+}
+body:not(.post-name-contact) .grecaptcha-badge { visibility: hidden; }
